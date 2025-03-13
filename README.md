@@ -39,6 +39,9 @@ Colocalization is mainly composed of two steps, which are generally merged in a 
 
 # Running Flanders
 
+## Installation
+
+## 
 
 Example of `nf-hcoloc_run.sbatch` to run the pipeline.
 For the first nextflow run (`nextflow run nf-hcoloc/main.nf`), user must provide to `--inputFileList` a table listing all required metadata for each GWAS summary statistics you want to analysis (see example below).
