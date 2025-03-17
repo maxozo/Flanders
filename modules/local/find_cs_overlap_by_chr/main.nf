@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 
 process FIND_CS_OVERLAP_BY_CHR {
+  label "process_high"
 
   // Define input
   input:
