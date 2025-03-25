@@ -1,0 +1,6 @@
+.nextflow*
+work/
+.DS_Store
+.Rhistory
+.RData
+results/

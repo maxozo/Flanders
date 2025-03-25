@@ -1,5 +1,4 @@
 #!/usr/bin/env nextflow
-
 process MUNG_AND_LOCUS_BREAKER {
   label "process_high"
 

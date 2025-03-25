@@ -137,10 +137,10 @@ dataset.munge_hor=function(sumstats.file
     dataset <- dataset %>% mutate(MAF=ifelse(MAF<0.5, MAF, 1-MAF))
   }
   
-  if(!is.null(n.lab) & n.lab %in% names(dataset)){
+  if (!is.null(n.lab) && !is.na(n.lab) && n.lab %in% names(dataset) && !all(is.na(dataset[[n.lab]]))) {
     names(dataset)[names(dataset)==n.lab]="N"
-  } else if( (is.null(n.lab) || is.na(n.lab) || n.lab=="NA" || !(n.lab %in% names(dataset))) && "MAF" %in% names(dataset)) {
-    N_hat<-median(1/((2*dataset$MAF*(1-dataset$MAF))*dataset$SE^2),na.rm = T) 
+  } else if( "MAF" %in% names(dataset)) {
+    N_hat <- median(1/((2*dataset$MAF*(1-dataset$MAF))*dataset$SE^2),na.rm = T) 
     dataset$N=ceiling(N_hat)
   } ### if both effect allele, MAF and N are not reported, it will calculated from the LD reference bfiles in the alignment step
   
@@ -612,6 +612,10 @@ prep_susie_ld <- function(
   
   geno <- fread(paste0(random.number, ".raw"))[,-c(1:6)] ### First 6 columns are FID, IID, PAT, MAT, SEX and PHENOTYPE
   
+  # Check which SNPs have the same genotype for all samples and remove them
+  not_same_geno <- which(sapply(geno, function(x) length(unique(x)) > 1))
+  geno <- geno[, ..not_same_geno]
+  
   # split the SNP names into rsID, effective and other alleles
   snp_info <- strsplit(colnames(geno), "_|\\(/|\\)") %>%
     Reduce(rbind,.) %>%
@@ -644,7 +648,10 @@ prep_susie_ld <- function(
   # Impute missing genotypes with mean value  
   geno <- apply(geno, 2, function(x) {x[is.na(x)] <- mean(x,na.rm=TRUE); return(x)})
   # Correlation matrix
-  ld <- cor(geno) #### NB: don't square it!!!!
+  #ld <- cor(geno) #### NB: don't square it!!!!
+  X_scaled <- scale(geno)  # Standardize columns
+  ld <- crossprod(X_scaled) / (nrow(geno) - 1) # Same as cor(), but faster
+  
   system(paste0("rm ", random.number, "*"))
   return(ld)
 }
@@ -669,11 +676,11 @@ finemap.cojo <- function(D, cs_threshold=0.99){
   fine.res <- finemap.abf_NO_PRIOR(D_list) %>%
     left_join(D %>% dplyr::select(snp, b, beta, pvalues), by="snp") %>%
     dplyr::mutate(cojo_snp=cojo_snp) %>%
-    dplyr::rename(bC=beta, pC=pvalues, "lABF"="lABF.") %>%
+    dplyr::rename(bC=beta, bC_se=se, "lABF"="lABF.") %>%
     arrange(desc(SNP.PP)) %>% 
     mutate(cred.set = cumsum(SNP.PP)) %>%
 # Add cojo_hit info, to merge with loci table later
-    dplyr::select(snp, position, b, bC, pC, lABF, SNP.PP, cred.set, cojo_snp)
+    dplyr::select(snp, position, bC, bC_se, lABF, SNP.PP, cred.set, cojo_snp)
 
 # Identify SNPs part of the credible set (as specified by cs_threshold)
   w <- which(fine.res$cred.set > cs_threshold)[1]
