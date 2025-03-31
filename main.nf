@@ -12,11 +12,10 @@ include { COJO_AND_FINEMAPPING    } from "./modules/local/cojo_and_finemapping"
 include { APPEND_TO_MASTER_COLOC  } from "./modules/local/append_to_master_coloc"
 include { APPEND_TO_IND_SNPS_TAB  } from "./modules/local/append_to_ind_snps_tab"
 
-def lauDir = workflow.launchDir.toString()
-
 // Define the main workflow
 workflow {
 
+chain_file = file("${projectDir}/assets/hg19ToHg38.over.chain")
 // Define a channel for each process
 
   // Define input channel for munging of GWAS sum stats
@@ -35,6 +34,7 @@ workflow {
       ],
       [
         "is_molQTL": row.is_molQTL,
+        "run_liftover": params.run_liftover ? "T" : "F",
         "key": row.key,
         "chr_lab": row.chr_lab,
         "pos_lab": row.pos_lab,
@@ -61,7 +61,7 @@ workflow {
   }
 
   // Run MUNG_AND_LOCUS_BREAKER process on gwas_input channel
-  MUNG_AND_LOCUS_BREAKER(gwas_input)
+  MUNG_AND_LOCUS_BREAKER(gwas_input, chain_file)
 
 // Output channel of LOCUS_BREAKER *** process one locus at a time ***
   loci_for_finemapping = MUNG_AND_LOCUS_BREAKER.out.loci_table
@@ -106,11 +106,11 @@ workflow {
 
 
 // Run SUSIE_FINEMAPPING process on finemapping_input channel
-  SUSIE_FINEMAPPING(finemapping_input,lauDir)
+  SUSIE_FINEMAPPING(finemapping_input, params.outdir)
 
 
 // Run COJO on failed SUSIE loci (only for specific errors!! Stored in the R script of susie)
-  COJO_AND_FINEMAPPING(SUSIE_FINEMAPPING.out.failed_susie_loci, lauDir)
+  COJO_AND_FINEMAPPING(SUSIE_FINEMAPPING.out.failed_susie_loci, params.outdir)
    
 // Append all to independent SNPs table /// What if the channel is empty?? Can you check and behave accordingly?
   append_ind_snps = COJO_AND_FINEMAPPING.out.ind_snps_table
