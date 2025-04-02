@@ -4,30 +4,34 @@ nextflow.enable.dsl=2 // specify the Domain Specific Language version to be used
 
 // Set parameter for pipeline version - only for documenting sake
 //params.pipe_vers="1.0"
-
 // Source all processes
-include { MUNG_AND_LOCUS_BREAKER  } from "./modules/local/mung_and_locus_breaker"
-include { SUSIE_FINEMAPPING       } from "./modules/local/susie_finemapping"
-include { COJO_AND_FINEMAPPING    } from "./modules/local/cojo_and_finemapping"
-include { APPEND_TO_MASTER_COLOC  } from "./modules/local/append_to_master_coloc"
-include { APPEND_TO_IND_SNPS_TAB  } from "./modules/local/append_to_ind_snps_tab"
+include { MUNG_AND_LOCUS_BREAKER  }  from "./modules/local/mung_and_locus_breaker"
+include { SUSIE_FINEMAPPING       }  from "./modules/local/susie_finemapping"
+include { COJO_AND_FINEMAPPING    }  from "./modules/local/cojo_and_finemapping"
+include { APPEND_TO_MASTER_COLOC  }  from "./modules/local/append_to_master_coloc"
+include { APPEND_TO_IND_SNPS_TAB  }  from "./modules/local/append_to_ind_snps_tab"
+include { INPUT_COLUMNS_VALIDATION } from "./modules/local/input_columns_validation"
+include { samplesheetToList } from 'plugin/nf-schema'
 
-// Define the main workflow
+
 workflow {
 
 chain_file = file("${projectDir}/assets/hg19ToHg38.over.chain")
-// Define a channel for each process
+// Use nf-schema to read and validate the sample sheet
+samplesheetToList(params.inputFileList, params.schema)
 
-  // Define input channel for munging of GWAS sum stats
-  // Split the input .tsv file (specified as argument when sbatching the nextflow command) into rows, the defined channel will be applied to each row. Then assign each column to a parameter (based on column name) - tuple of: study id, other specific metadata parameters, gwas sum stats (row.input)
+// Validate input file
+// In case we are running a test profile, we need to set the base_dir to the projectDir
+base_dir = params.is_test_profile ? "${projectDir}" : "${launchDir}"
+INPUT_COLUMNS_VALIDATION(file(params.inputFileList), base_dir)
 
-  gwas_input = Channel
-  .of(file(params.inputFileList))
+// Define input channel for munging of GWAS sumstats
+
+gwas_input = INPUT_COLUMNS_VALIDATION.out.table_out
   .splitCsv(header:true, sep:"\t")
   .map { row -> 
-    def gwas_file = params.is_test_profile ? file("${projectDir}/${row.input}", checkIfExists:true) : file("${row.input}", checkIfExists:true)
-    def bfile = params.is_test_profile ? file("${projectDir}/${row.bfile}.{bed,bim,fam}", checkIfExists:true) : file("${row.bfile}.{bed,bim,fam}", checkIfExists:true)
     def bfile_string = params.is_test_profile ? "${projectDir}/${row.bfile}" : "${row.bfile}"
+    def gwas_file = params.is_test_profile ? file("${projectDir}/${row.input}", checkIfExists:true) : file("${row.input}", checkIfExists:true)
     tuple(
       [
         "study_id": row.study_id
@@ -59,7 +63,6 @@ chain_file = file("${projectDir}/assets/hg19ToHg38.over.chain")
       gwas_file
     )
   }
-
   // Run MUNG_AND_LOCUS_BREAKER process on gwas_input channel
   MUNG_AND_LOCUS_BREAKER(gwas_input, chain_file)
 
