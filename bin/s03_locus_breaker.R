@@ -1,3 +1,5 @@
+#!/usr/bin/env -S Rscript --vanilla
+
 suppressMessages(library(optparse))
 
 option_list <- list(
