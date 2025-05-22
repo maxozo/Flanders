@@ -111,6 +111,11 @@ dataset.munge_hor=function(sumstats.file
     stop("pos.lab has not been defined or the column is missing") ### Can be as well retrieved from LD reference bfiles??
   }
   
+  #### Put either frequency of N mandatory
+  if( !( freq.lab %in% names(dataset) | n.lab %in% names(dataset) )) {
+    stop("Either effect allele frequency or N sample size needs to be provided!")
+  }
+  
   if(!is.null(freq.lab) & freq.lab %in% names(dataset)){
     names(dataset)[names(dataset)==freq.lab]="freq"
   } ### if effect allele frequency is not reported, it will calculated from the LD reference bfiles in the alignment step
@@ -170,15 +175,16 @@ dataset.munge_hor=function(sumstats.file
       # If a single value is provided
     } else if (!is.null(sdY) && !is.na(sdY) && sdY != "NA") {
       dataset[ , sdY := sdY]
-    } else {
+    } else if ("MAF" %in% names(dataset)) {
       # If sdY is not provided, calculate it
       dataset[, sdY := coloc:::sdY.est(varbeta, MAF, N), by = phenotype_id]
     }
   }
   
   # Select only necessary columns
-  columns <- c("phenotype_id","snp_original","CHR","BP","A1","A2","freq","BETA","varbeta","SE","P","MAF","N","type", colname_for_type)
-  dataset <- dataset[, ..columns]
+  columns <- c("phenotype_id","snp_original","CHR","BP","A1","A2","BETA","varbeta","SE","P","type", intersect(c("N","freq","MAF","s", "sdY"), names(dataset)))
+  cols_to_remove <- setdiff(names(dataset), columns)
+  dataset[, (cols_to_remove) := NULL]
   
   if(type == "quant" && "s" %in% names(dataset)){
     dataset$s <- NULL
@@ -256,7 +262,7 @@ dataset.align <- function(dataset, bfile) {
     A1_old == A1 & A2_old == A2, BETA 
   )]
   
-  ### Check if freq (and MAF) are present in the dataframe - if not, compute them from defaul/custom LD reference
+  ### Check if freq (and MAF) are present in the dataframe - if not, compute them from LD reference
   
   if("freq" %in% colnames(dataset)){
     setnames(dataset, "freq", "freq_old") # Rename 'freq' to 'freq_old'
@@ -265,7 +271,7 @@ dataset.align <- function(dataset, bfile) {
   } else {
     message("Allele frequency not found in summary stat - Computing allele frequency from LD reference panel")
     ## Compute allele frequency from LD reference panel provided    
-    random.number <- stri_rand_strings(n=1, length=20, pattern = "[A-Za-z0-9]")
+    random.number <- stringi::stri_rand_strings(n=1, length=20, pattern = "[A-Za-z0-9]")
     exit_status = system(paste0("plink2 --bfile ", bfile, " --freq --make-bed --out ", random.number))
 
     # Raise an error if the external command fails
@@ -299,9 +305,15 @@ dataset.align <- function(dataset, bfile) {
   # Remove the old columns
   dataset[, `:=`(A1_old = NULL, A2_old = NULL)]
   
+  #### You can finally calculate N!
   if(!("N" %in% colnames(dataset))){
-    N_hat<-median(1/((2*dataset$MAF*(1-dataset$MAF))*dataset$SE^2),na.rm = T) 
+    N_hat <- median(1/((2*dataset$MAF*(1-dataset$MAF))*dataset$SE^2),na.rm = T) 
     dataset[ , N := ceiling(N_hat)]
+  }
+  
+  #### You can finally calculate sdY! If sdY is not provided, calculate it - ONLY IF type is not cc or sdY has not been already provided or calculated
+  if( !(unique(dataset$type)=="cc" | "sdY" %in% names(dataset)) ){
+    dataset[, sdY := coloc:::sdY.est(varbeta, MAF, N), by = phenotype_id]
   }
   
   # Select columns in the specified order

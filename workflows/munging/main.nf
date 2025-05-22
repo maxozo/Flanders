@@ -5,10 +5,7 @@ workflow RUN_MUNGING {
     sumstats_input // input channel for munging of GWAS sum stats
 		chain_file // file of hg19ToHg38 chain
 
-	main:
-  // Ensure the folder to store not finemapped loci exists
-  file("${params.outdir}/results/not_finemapped_loci").mkdirs()
-  
+	main: 
   // Run MUNG_AND_LOCUS_BREAKER process on gwas_input channel
   MUNG_AND_LOCUS_BREAKER(sumstats_input, chain_file)
 
@@ -41,7 +38,7 @@ workflow RUN_MUNGING {
     }
     .collectFile(
       newLine: true, 
-      name: "large_loci.tsv", storeDir: "${params.outdir}/results/not_finemapped_loci",
+      name: "NOT_FINEMAPPED_locus_too_large.tsv", storeDir: "${params.outdir}/results/finemapping_exceptions",
       seed: "study_id\tchr\tstart\tend\tlocus_size\tphenotype_id")
 
   emit:
