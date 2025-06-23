@@ -137,11 +137,11 @@ finemap2anndata <- function(
         finemap <- finemap$finemapping_lABFs
       }
       finemap <- data.table(finemap)
-      if("pC" %in% colnames(finemap) & !("p" %in% colnames(finemap)))
-        finemap <- finemap %>% rename(p=pC)
+#      if("pC" %in% colnames(finemap) & !("p" %in% colnames(finemap)))
+#        finemap <- finemap %>% rename(p=pC)
       
-      if("bC" %in% colnames(finemap) & !("b" %in% colnames(finemap)))
-        finemap <- finemap %>% rename(b=bC)
+#      if("bC" %in% colnames(finemap) & !("b" %in% colnames(finemap)))
+#        finemap <- finemap %>% rename(b=bC)
       
       success_count <- success_count + 1
       
